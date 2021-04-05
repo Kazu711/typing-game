@@ -89,9 +89,6 @@ class Application(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-   # btn1 = tk.Button(root,text="start")
-   # btn1.place(x=130,y=120)        
-   # btn2 = tk.Button(root,text="quit")
     Application(master=root)
     root.mainloop()
 
