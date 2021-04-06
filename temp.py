@@ -1,99 +1,91 @@
-import tkinter as tk
-from tkinter import messagebox
-import sys
-import time
-import threading
+from bs4 import BeautifulSoup
+from random import sample
+from time import time
+import requests
 
-QUESTION = ["tkinter", "geometry", "widgets", "messagebox", "configure", 
-            "label", "column", "rowspan", "grid", "init"]
+class TypingGame:
+    def __init__(self):
+        #Pythonの公式ドキュメント組み込み関数に関してのページ
+        self.URL = "https://docs.python.jp/3/library/functions.html"
+        #問題リスト
+        self.question_list = []
+        #出題数
+        self.question_num = 20
+        #正解数
+        self.correct_num = 0
+        #不正解リスト
+        self.mistake_list = []
+        #開始時間
+        self.start_time = 0
+        #終了時間
+        self.end_time = 0
 
-class Application(tk.Frame):
-    def __init__(self, master):
-        super().__init__(master)
-        self.pack()
-
-        master.geometry("300x200")
-        master.title("タイピングゲーム！")
-
-        # 問題数インデックス
-        self.index = 0
-
-        # 正解数カウント用
-        self.correct_cnt = 0
-
-        self.create_widgets()
-
-        # 経過時間スレッドの開始
-        t = threading.Thread(target=self.timer)
-        t.start()
-
-        # Tkインスタンスに対してキーイベント処理を実装
-        self.master.bind("<KeyPress>", self.type_event)
-
-    # ウィジェットの生成と配置
-    def create_widgets(self):
-        self.q_label = tk.Label(self, text="お題：", font=("",20))
-        self.q_label.grid(row=0, column=0)
-        self.q_label2 = tk.Label(self, text=QUESTION[self.index], width=10, anchor="w", font=("",20))
-        self.q_label2.grid(row=0, column=1)
-        self.ans_label = tk.Label(self, text="解答：", font=("",20))
-        self.ans_label.grid(row=1, column=0)
-        self.ans_label2 = tk.Label(self, text="", width=10, anchor="w", font=("",20))
-        self.ans_label2.grid(row=1, column=1)
-        self.result_label = tk.Label(self, text="", font=("",20))
-        self.result_label.grid(row=2, column=0, columnspan=2)
-
-        # # 時間計測用のラベル
-        self.time_label = tk.Label(self, text="", font=("",20))
-        self.time_label.grid(row=3, column=0, columnspan=2)
-
-        self.flg2 = True
-
-    # キー入力時のイベント処理
-    def type_event(self, event):
-        # 入力値がEnterの場合は答え合わせ
-        if event.keysym == "Return":
-            if self.q_label2["text"] == self.ans_label2["text"]:
-                self.result_label.configure(text="正解！", fg="red")
-                self.correct_cnt += 1
-            else:
-                self.result_label.configure(text="残念！", fg="blue")
-
-            # 解答欄をクリア
-            self.ans_label2.configure(text="")
-
-            # 次の問題を出題
-            self.index += 1
-            if self.index == len(QUESTION):
-                self.flg = False
-                self.q_label2.configure(text="終了！")
-                messagebox.showinfo("リザルト", f"あなたのスコアは{self.correct_cnt}/{self.index}問正解です。\nクリアタイムは{self.second}秒です。")
-                sys.exit(0)
-            self.q_label2.configure(text=QUESTION[self.index])
-
-        elif event.keysym == "BackSpace":
-            text = self.ans_label2["text"]
-            self.ans_label2["text"] = text[:-1]
-
+    #問題生成メソッド
+    def generate_question(self):
+        res = requests.get(self.URL)
+        #文字コードを変換 
+        res.encoding = res.apparent_encoding
+        #レスポンスのテキスト情報をhtmlに解釈する
+        soup = BeautifulSoup(res.text,"html.parser")
+        #組み込み関数一覧が表示されているテーブルタグ全体の情報を抜き出す
+        built_in_func_table = soup.find_all("table",class_="docutils",limit=1)
+        #リストからhtmlの要素を取り出す
+        built_in_func_table = built_in_func_table[0]
+        #テーブル内の組込み関数のタグを取得
+        built_in_func_tags = built_in_func_table.find_all("span",class_="pre")
+        #問題リストに組み込み関数の文字列を格納 
+        for tag in built_in_func_tags:
+            self.question_list.append(tag.text)
+        
+    #問題表示
+    def show_question(self):
+        question = sample(self.question_list,1)
+        return question[0]
+    
+    #判定メソッド
+    def judge(self,question):
+        user_input = input("=>")
+        if question == user_input:
+            print("Great!!")
+            self.correct_num += 1
         else:
-            # 入力値がEnter以外の場合は文字入力としてラベルに追記する
-            self.ans_label2["text"] += event.keysym
-
-    def timer(self):
-        self.second = 0
-        self.flg = True
-        while self.flg:
-            self.second += 1
-            self.time_label.configure(text=f"経過時間：{self.second}秒")
-            time.sleep(1)
+            print("Boo!")
+            self.mistake_list.append(question)
+    
+    #結果表示
+    def show_result(self):
+        play_time = round(self.end_time - self.start_time,2)
+        accuracy = round(self.correct_num / self.question_num,1)*100
+        print(" -----結果発表-----")
+        print("正答率:{}%".format(accuracy))
+        print("時間:{}秒".format(play_time))
+        if len(self.mistake_list) == 0:
+            print("perfect!!")
+        else:
+            print("間違えた問題")
+            for mistake in self.mistake_list:
+                print(mistake)
+    
+    #ゲーム処理
+    def main(self):
+        #開始時間計測
+        self.start_time = time()
+        #出題と判定の繰り返し
+        for _ in range(self.question_num):
+            question = self.show_question()
+            print("{}".format(question))
+            self.judge(question)
+        #終了時間計測
+        self.end_time = time()
+        self.show_result()
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    Application(master=root)
-    root.mainloop()
-
-
-
-
-
-
+    game = TypingGame()
+    game.generate_question()
+    print("組み込み関数pythonタイピングゲーム")
+    while 1:
+        game_flag = int(input("1:スタート/0:終了"))
+        if game_flag == 1:
+            game.main()
+        else:
+            break
